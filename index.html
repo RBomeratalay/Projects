@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Object Size Measurement</title>
+    <script async src="opencv.js" type="text/javascript"></script>
+    <script type="text/javascript">
+        function midpoint(ptA, ptB) {
+            return [(ptA.x + ptB.x) * 0.5, (ptA.y + ptB.y) * 0.5];
+        }
+
+        function onOpenCvReady() {
+            document.getElementById('status').innerHTML = 'OpenCV.js is ready.';
+            let inputElement = document.getElementById('fileInput');
+            inputElement.addEventListener('change', (e) => {
+                let imgElement = document.getElementById('imageSrc');
+                imgElement.src = URL.createObjectURL(e.target.files[0]);
+                imgElement.onload = () => {
+                    let mat = cv.imread(imgElement);
+                    processImage(mat);
+                };
+            });
+        }
+
+        function processImage(src) {
+            let gray = new cv.Mat();
+            let blurred = new cv.Mat();
+            let edged = new cv.Mat();
+            cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY, 0);
+            cv.GaussianBlur(gray, blurred, new cv.Size(7, 7), 0, 0, cv.BORDER_DEFAULT);
+            cv.Canny(blurred, edged, 50, 100, 3, false);
+            let kernel = cv.Mat.ones(3, 3, cv.CV_8U);
+            cv.dilate(edged, edged, kernel);
+            cv.erode(edged, edged, kernel);
+            kernel.delete();
+
+            let contours = new cv.MatVector();
+            let hierarchy = new cv.Mat();
+            cv.findContours(edged, contours, hierarchy, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE);
+
+            let pixelsPerMetric = null;
+            let orig = src.clone();
+
+            for (let i = 0; i < contours.size(); ++i) {
+                let cnt = contours.get(i);
+                let area = cv.contourArea(cnt);
+                if (area < 100) {
+                    cnt.delete();
+                    continue;
+                }
+
+                let rect = cv.minAreaRect(cnt);
+                let points = cv.RotatedRect.points(rect);
+                let orderedPoints = orderPoints(points);
+                let [tl, tr, br, bl] = orderedPoints;
+
+                let contourArray = cv.matFromArray(4, 1, cv.CV_32SC2, [
+                    tl.x, tl.y,
+                    tr.x, tr.y,
+                    br.x, br.y,
+                    bl.x, bl.y
+                ]);
+                let contourVec = new cv.MatVector();
+                contourVec.push_back(contourArray);
+                cv.drawContours(orig, contourVec, 0, new cv.Scalar(0, 255, 0), 2);
+
+                let [tltrX, tltrY] = midpoint(tl, tr);
+                let [blbrX, blbrY] = midpoint(bl, br);
+                let [tlblX, tlblY] = midpoint(tl, bl);
+                let [trbrX, trbrY] = midpoint(tr, br);
+
+                cv.circle(orig, new cv.Point(tltrX, tltrY), 5, new cv.Scalar(255, 0, 0), -1);
+                cv.circle(orig, new cv.Point(blbrX, blbrY), 5, new cv.Scalar(255, 0, 0), -1);
+                cv.circle(orig, new cv.Point(tlblX, tlblY), 5, new cv.Scalar(255, 0, 0), -1);
+                cv.circle(orig, new cv.Point(trbrX, trbrY), 5, new cv.Scalar(255, 0, 0), -1);
+
+                cv.line(orig, new cv.Point(tltrX, tltrY), new cv.Point(blbrX, blbrY), new cv.Scalar(255, 0, 255), 2);
+                cv.line(orig, new cv.Point(tlblX, tlblY), new cv.Point(trbrX, trbrY), new cv.Scalar(255, 0, 255), 2);
+
+                let dA = Math.sqrt((tltrX - blbrX) ** 2 + (tltrY - blbrY) ** 2);
+                let dB = Math.sqrt((tlblX - trbrX) ** 2 + (tlblY - trbrY) ** 2);
+
+                if (!pixelsPerMetric) {
+                    pixelsPerMetric = dA / 29.5; // Change this to your required width
+                }
+
+                let dimA = dA / pixelsPerMetric;
+                let dimB = dB / pixelsPerMetric;
+
+                cv.putText(orig, `${dimA.toFixed(1)}cm`, new cv.Point(tltrX - 15, tltrY - 10), cv.FONT_HERSHEY_SIMPLEX, 0.65, new cv.Scalar(255, 50, 100), 2);
+                cv.putText(orig, `${dimB.toFixed(1)}cm`, new cv.Point(trbrX + 10, trbrY), cv.FONT_HERSHEY_SIMPLEX, 0.65, new cv.Scalar(255, 50, 100), 2);
+
+                contourArray.delete();
+                contourVec.delete();
+            }
+
+            cv.imshow('outputCanvas', orig);
+
+            src.delete();
+            gray.delete();
+            blurred.delete();
+            edged.delete();
+            contours.delete();
+            hierarchy.delete();
+            orig.delete();
+        }
+
+        function orderPoints(points) {
+            points.sort((a, b) => a.x - b.x);
+            let [leftMost, rightMost] = [points.slice(0, 2), points.slice(2)];
+
+            leftMost.sort((a, b) => a.y - b.y);
+            let [tl, bl] = leftMost;
+
+            let [tr, br] = rightMost.sort((a, b) => a.y - b.y);
+
+            return [tl, tr, br, bl];
+        }
+    </script>
+</head>
+<body onload="onOpenCvReady();">
+    <h1>Object Size Measurement</h1>
+    <p id="status">Loading OpenCV.js...</p>
+    <input type="file" id="fileInput" name="file">
+    <br><br>
+    <img id="imageSrc" alt="Input Image" style="display:none;">
+    <canvas id="outputCanvas"></canvas>
+</body>
+</html>
