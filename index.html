@@ -118,12 +118,15 @@
     </script>
 </head>
 <body onload="onOpenCvReady();">
-    <h1>Bobin Çap Ölçümü</h1>
-    <p id="status">Loading OpenCV.js...</p>
-    <p>Arka fon mümkünse siyah olmalı ve bobin dik çekilmelidir.</p>
-    <input type="file" id="fileInput" name="file">
-    <br><br>
-    <img id="imageSrc" alt="Input Image" style="display:none;">
-    <canvas id="outputCanvas"></canvas>
+    <div style="maxwidth:"100%">
+        <h1>Bobin Çap Ölçümü</h1>
+        <p id="status">Loading OpenCV.js...</p>
+        <p>Arka fon mümkünse siyah olmalı ve bobin dik çekilmelidir.</p>
+        <input type="file" id="fileInput" name="file">
+        <br><br>
+        <img id="imageSrc" alt="Input Image" style="display:none;maxwidth:100%">
+        <canvas id="outputCanvas"></canvas>
+    </div>
+
 </body>
 </html>
